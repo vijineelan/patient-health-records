@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Patient Health Records</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body { background: #f4f6fb; color: #1f2937; }
+    .app-header { background: linear-gradient(135deg, #1e3a8a, #2563eb); color: #fff; padding: 2rem 0 3.5rem; }
+    .app-header h1 { font-size: 1.6rem; font-weight: 600; margin: 0; }
+    .app-header p { margin: .25rem 0 0; opacity: .85; font-size: .95rem; }
+    .content { margin-top: -2.25rem; padding-bottom: 3rem; }
+    .panel { background: #fff; border: 0; border-radius: 14px; box-shadow: 0 2px 12px rgba(15, 23, 42, .08); }
+    .panel-title { font-size: 1.05rem; font-weight: 600; margin: 0; }
+    .form-label { font-size: .85rem; font-weight: 500; color: #4b5563; margin-bottom: .3rem; }
+    .form-control { padding: .55rem .8rem; border-radius: 8px; }
+    .table { margin: 0; }
+    .table thead th { font-size: .75rem; text-transform: uppercase; letter-spacing: .04em; color: #6b7280;
+                      background: #f9fafb; border-bottom: 1px solid #e5e7eb; padding: .8rem 1rem; white-space: nowrap; }
+    .table tbody td { padding: 1rem; vertical-align: top; border-color: #eef0f4; }
+    .nowrap { white-space: nowrap; }
+    .num { text-align: right; font-variant-numeric: tabular-nums; }
+    .remarks { min-width: 320px; max-width: 460px; line-height: 1.45; font-size: .92rem; }
+    .remarks.muted { color: #9ca3af; font-style: italic; }
+    .badge-risk { font-size: .72rem; font-weight: 600; letter-spacing: .03em; padding: .35em .7em; border-radius: 999px; margin-bottom: .35rem; display: inline-block; }
+    .risk-high { background: #fee2e2; color: #b91c1c; }
+    .risk-moderate { background: #fef3c7; color: #b45309; }
+    .risk-low { background: #dcfce7; color: #15803d; }
+    .actions { display: flex; gap: .4rem; justify-content: flex-end; }
+    .actions form { margin: 0; }
+  </style>
+</head>
+<body>
+
+<div class="app-header">
+  <div class="container-xxl px-4">
+    <h1>Patient Health Records</h1>
+    <p>Blood test results with AI-generated risk remarks</p>
+  </div>
+</div>
+
+<div class="container-xxl px-4 content">
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <div class="alert alert-{{ category }} alert-dismissible fade show shadow-sm" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+      </div>
+    {% endfor %}
+  {% endwith %}
+
+  <div class="panel p-4 mb-4">
+    <h2 class="panel-title mb-3">{{ 'Edit record #' ~ edit['id'] if edit else 'Add new record' }}</h2>
+    <form method="post" action="{{ url_for('edit', pid=edit['id']) if edit else url_for('add') }}" class="row g-3" onsubmit="this.querySelector('button[type=submit]').disabled = true;">
+      <div class="col-lg-4 col-md-6">
+        <label class="form-label" for="full_name">Full name</label>
+        <input class="form-control" id="full_name" name="full_name" value="{{ values.get('full_name', '') }}" required>
+      </div>
+      <div class="col-lg-3 col-md-6">
+        <label class="form-label" for="dob">Date of birth (dd/mm/yyyy)</label>
+        <input class="form-control" id="dob" name="dob" placeholder="dd/mm/yyyy" value="{{ values.get('dob', '') }}" required>
+      </div>
+      <div class="col-lg-5 col-md-12">
+        <label class="form-label" for="email">Email</label>
+        <input class="form-control" id="email" name="email" value="{{ values.get('email', '') }}" required>
+      </div>
+      <div class="col-lg-4 col-md-4">
+        <label class="form-label" for="glucose">Glucose (mg/dL)</label>
+        <input class="form-control" id="glucose" name="glucose" value="{{ values.get('glucose', '') }}" required>
+      </div>
+      <div class="col-lg-4 col-md-4">
+        <label class="form-label" for="haemoglobin">Haemoglobin (g/dL)</label>
+        <input class="form-control" id="haemoglobin" name="haemoglobin" value="{{ values.get('haemoglobin', '') }}" required>
+      </div>
+      <div class="col-lg-4 col-md-4">
+        <label class="form-label" for="cholesterol">Cholesterol (mg/dL)</label>
+        <input class="form-control" id="cholesterol" name="cholesterol" value="{{ values.get('cholesterol', '') }}" required>
+      </div>
+      <div class="col-12 pt-1">
+        <button class="btn btn-primary px-4" type="submit">{{ 'Save changes' if edit else 'Add record' }}</button>
+        {% if edit %}
+          <a class="btn btn-outline-secondary px-4 ms-2" href="{{ url_for('index') }}">Cancel</a>
+        {% else %}
+          <a class="btn btn-outline-secondary px-4 ms-2" href="{{ url_for('index') }}">Clear</a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+
+  <div class="panel overflow-hidden">
+    <div class="px-4 py-3 d-flex justify-content-between align-items-center">
+      <h2 class="panel-title">Records</h2>
+      <span class="text-muted small">{{ rows|length }} total</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Full name</th>
+            <th>Date of birth</th>
+            <th>Email</th>
+            <th class="num">Glucose<br><span class="fw-normal text-lowercase">mg/dL</span></th>
+            <th class="num">Haemoglobin<br><span class="fw-normal text-lowercase">g/dL</span></th>
+            <th class="num">Cholesterol<br><span class="fw-normal text-lowercase">mg/dL</span></th>
+            <th>Remarks (AI)</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+        {% for r in rows %}
+          {% set rem = r['remarks'] or '' %}
+          {% set low = rem.lower() %}
+          <tr>
+            <td class="text-muted">{{ r['id'] }}</td>
+            <td class="nowrap fw-semibold">{{ r['full_name'] }}</td>
+            <td class="nowrap">{{ r['dob'] }}</td>
+            <td class="nowrap">{{ r['email'] }}</td>
+            <td class="num">{{ '%g'|format(r['glucose']) }}</td>
+            <td class="num">{{ '%g'|format(r['haemoglobin']) }}</td>
+            <td class="num">{{ '%g'|format(r['cholesterol']) }}</td>
+            <td class="remarks{{ ' muted' if low.startswith('ai prediction') else '' }}">
+              {% if low.startswith('high') %}<span class="badge-risk risk-high">HIGH RISK</span><br>
+              {% elif low.startswith('moderate') %}<span class="badge-risk risk-moderate">MODERATE RISK</span><br>
+              {% elif low.startswith('low') %}<span class="badge-risk risk-low">LOW RISK</span><br>
+              {% endif %}
+              {{ rem }}
+            </td>
+            <td class="nowrap">
+              <div class="actions">
+                <a class="btn btn-sm btn-outline-primary" href="{{ url_for('edit', pid=r['id']) }}">Edit</a>
+                <form method="post" action="{{ url_for('retry', pid=r['id']) }}">
+                  <button class="btn btn-sm btn-outline-secondary" type="submit">Retry AI</button>
+                </form>
+                <form method="post" action="{{ url_for('delete', pid=r['id']) }}"
+                      onsubmit="return confirm('Delete this record?');">
+                  <button class="btn btn-sm btn-outline-danger" type="submit">Delete</button>
+                </form>
+              </div>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="9" class="text-center text-muted py-5">No records yet. Add the first one above.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
